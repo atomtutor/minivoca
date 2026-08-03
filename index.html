@@ -1,0 +1,864 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>미니단어장 영단어 암기</title>
+<style>
+  /* ===== 기본 리셋 & 레이아웃 ===== */
+  * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+  html, body {
+    margin: 0; padding: 0;
+    background: #f5f7fa;
+    font-family: -apple-system, BlinkMacSystemFont, "Apple SD Gothic Neo",
+                 "Malgun Gothic", "맑은 고딕", sans-serif;
+    color: #212529;
+  }
+  /* 모바일 기준: 최대 480px 중앙 정렬 */
+  .app {
+    max-width: 480px;
+    margin: 0 auto;
+    min-height: 100vh;
+    padding: 16px;
+    display: flex;
+    flex-direction: column;
+  }
+  /* 카드형 흰색 컨테이너 */
+  .card {
+    background: #ffffff;
+    border-radius: 16px;
+    box-shadow: 0 4px 16px rgba(0,0,0,0.06);
+    padding: 24px 20px;
+    margin-top: 8px;
+  }
+
+  /* ===== 화면 전환 (SPA) ===== */
+  .screen { display: none; animation: fade 0.3s ease; }
+  .screen.active { display: block; }
+  @keyframes fade {
+    from { opacity: 0; transform: translateY(8px); }
+    to   { opacity: 1; transform: translateY(0); }
+  }
+
+  h1 { font-size: 24px; text-align: center; margin: 8px 0 20px; }
+  h2 { font-size: 22px; text-align: center; margin: 4px 0 16px; }
+
+  /* ===== 입력 폼 ===== */
+  .field { margin-bottom: 18px; }
+  .field label {
+    display: block; font-size: 15px; font-weight: 600;
+    margin-bottom: 8px; color: #495057;
+  }
+  .row { display: flex; gap: 10px; align-items: center; }
+  .row .sep { color: #adb5bd; font-weight: 600; }
+  input[type="number"], input[type="text"], select {
+    width: 100%;
+    height: 52px;
+    padding: 0 14px;
+    font-size: 18px;
+    border: 2px solid #dee2e6;
+    border-radius: 10px;
+    background: #fff;
+    outline: none;
+    transition: border-color 0.2s;
+  }
+  select {
+    -webkit-appearance: none;
+    appearance: none;
+    background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'><path fill='%23495057' d='M7 10l5 5 5-5z'/></svg>");
+    background-repeat: no-repeat;
+    background-position: right 14px center;
+    background-size: 20px;
+    padding-right: 40px;
+  }
+  input:focus, select:focus { border-color: #007bff; }
+  .hint { font-size: 13px; color: #868e96; margin-top: 6px; }
+  .subfield { display: none; }
+  .subfield.active { display: block; }
+
+  /* ===== 버튼 ===== */
+  button {
+    font-family: inherit;
+    cursor: pointer;
+    border: none;
+  }
+  .btn-primary {
+    width: 100%;
+    min-height: 52px;
+    background: #007bff;
+    color: #fff;
+    font-size: 18px;
+    font-weight: 700;
+    border-radius: 12px;
+    transition: background 0.2s, transform 0.1s;
+  }
+  .btn-primary:active { transform: scale(0.98); }
+  .btn-primary:hover { background: #0069d9; }
+  .btn-sub {
+    width: 100%;
+    min-height: 50px;
+    background: #e9ecef;
+    color: #343a40;
+    font-size: 16px;
+    font-weight: 600;
+    border-radius: 12px;
+    margin-top: 10px;
+  }
+  .btn-sub:active { transform: scale(0.98); }
+
+  /* 에러/안내 메시지 */
+  .msg {
+    margin: 12px 0 0;
+    padding: 12px 14px;
+    border-radius: 10px;
+    font-size: 14px;
+    line-height: 1.5;
+    display: none;
+  }
+  .msg.show { display: block; }
+  .msg.error   { background: #fdecea; color: #b02a37; }
+  .msg.notice  { background: #e7f1ff; color: #0b5ed7; }
+
+  /* ===== 문제 풀이 화면 ===== */
+  .topbar { margin-bottom: 16px; }
+  .progress-text { font-size: 15px; font-weight: 700; color: #495057; text-align: center; margin-bottom: 8px; }
+  .progress-bar-bg {
+    width: 100%; height: 10px;
+    background: #e9ecef; border-radius: 999px; overflow: hidden;
+  }
+  .progress-bar-fill {
+    height: 100%; width: 0%;
+    background: #007bff; border-radius: 999px;
+    transition: width 0.3s ease;
+  }
+
+  .badge {
+    display: inline-block;
+    font-size: 13px; font-weight: 700;
+    color: #fff; background: #6c757d;
+    padding: 5px 12px; border-radius: 999px;
+    margin-bottom: 16px;
+  }
+
+  .question {
+    font-size: 26px;
+    font-weight: 700;
+    text-align: center;
+    line-height: 1.4;
+    margin: 8px 0 22px;
+    word-break: break-word;
+  }
+  .question .sub {
+    display: block;
+    font-size: 18px;
+    font-weight: 500;
+    color: #868e96;
+    margin-top: 10px;
+  }
+  .question .blankword {
+    letter-spacing: 3px;
+    font-family: "Courier New", monospace;
+    font-size: 30px;
+    color: #212529;
+  }
+
+  /* 보기 버튼 (세로 나열, 전체 너비) */
+  .options { display: flex; flex-direction: column; gap: 10px; }
+  .option {
+    width: 100%;
+    min-height: 52px;
+    padding: 12px 16px;
+    font-size: 18px;
+    text-align: left;
+    background: #fff;
+    border: 2px solid #dee2e6;
+    border-radius: 12px;
+    transition: background 0.15s, border-color 0.15s, opacity 0.15s;
+    word-break: break-word;
+  }
+  .option:hover { border-color: #adb5bd; }
+  .option:active { background: #f1f3f5; }
+  .option.correct { background: #28a745; border-color: #28a745; color: #fff; }
+  .option.wrong   { background: #dc3545; border-color: #dc3545; color: #fff; }
+  .option.disabled { opacity: 0.45; pointer-events: none; }
+
+  /* 직접 입력 영역 */
+  .input-area { display: flex; flex-direction: column; gap: 10px; }
+
+  /* 채점 피드백 */
+  .feedback {
+    margin-top: 18px;
+    text-align: center;
+    font-size: 18px;
+    font-weight: 700;
+    min-height: 26px;
+  }
+  .feedback.correct { color: #28a745; }
+  .feedback.wrong   { color: #dc3545; }
+
+  /* ===== 결과 화면 ===== */
+  .stat-list { margin: 10px 0 18px; }
+  .stat-row {
+    display: flex; justify-content: space-between;
+    padding: 12px 4px;
+    border-bottom: 1px solid #f1f3f5;
+    font-size: 16px;
+  }
+  .stat-row .label { color: #495057; }
+  .stat-row .value { font-weight: 700; }
+  .stat-total {
+    text-align: center;
+    font-size: 20px; font-weight: 800;
+    color: #007bff;
+    margin: 14px 0 6px;
+  }
+  .review-title { font-size: 16px; font-weight: 700; margin: 20px 0 8px; }
+  .review-list { display: flex; flex-direction: column; gap: 8px; }
+  .review-item {
+    background: #fff5f5;
+    border: 1px solid #f5c2c7;
+    border-radius: 10px;
+    padding: 10px 14px;
+    font-size: 15px;
+  }
+  .review-item .eng { font-weight: 700; color: #b02a37; }
+  .review-item .kor { color: #495057; margin-top: 2px; }
+  .review-empty { color: #28a745; font-weight: 600; text-align: center; padding: 10px; }
+</style>
+</head>
+<body>
+<div class="app">
+
+  <!-- ================= 화면 1: 설정 ================= -->
+  <section id="screen-setup" class="screen active">
+    <div class="card">
+      <h1>미니단어장 영단어 암기</h1>
+
+      <!-- 범위 선택 방식 -->
+      <div class="field">
+        <label>범위 선택 방식</label>
+        <select id="modeSelect">
+          <option value="unit">Unit 번호로 선택</option>
+          <option value="num">단어 번호로 선택</option>
+        </select>
+      </div>
+
+      <!-- Unit 범위 -->
+      <div class="field subfield active" id="unitRangeField">
+        <label id="unitRangeLabel">Unit 범위 (1 ~ 15)</label>
+        <div class="row">
+          <input type="number" id="unitStart" min="1" max="15" placeholder="시작" inputmode="numeric">
+          <span class="sep">~</span>
+          <input type="number" id="unitEnd" min="1" max="15" placeholder="끝" inputmode="numeric">
+        </div>
+        <div class="hint">예) 1 ~ 3 (선택한 Unit의 단어 전체가 출제 범위가 됩니다)</div>
+      </div>
+
+      <!-- 단어 번호 범위 -->
+      <div class="field subfield" id="numRangeField">
+        <label id="numRangeLabel">단어 번호 범위 (1 ~ 550)</label>
+        <div class="row">
+          <input type="number" id="startNum" min="1" max="550" placeholder="시작" inputmode="numeric">
+          <span class="sep">~</span>
+          <input type="number" id="endNum" min="1" max="550" placeholder="끝" inputmode="numeric">
+        </div>
+        <div class="hint">예) 1 ~ 100 (범위 내 단어가 최소 4개 필요)</div>
+      </div>
+
+      <!-- 문제 수 -->
+      <div class="field">
+        <label>문제 수 (10 ~ 100)</label>
+        <input type="number" id="countNum" min="10" max="100" value="10" inputmode="numeric">
+        <div class="hint">범위 내 단어 수보다 많으면 자동 조정됩니다.</div>
+      </div>
+
+      <div id="setupMsg" class="msg"></div>
+
+      <button class="btn-primary" id="startBtn">시작하기</button>
+    </div>
+  </section>
+
+  <!-- ================= 화면 2: 문제 풀이 ================= -->
+  <section id="screen-quiz" class="screen">
+    <div class="topbar">
+      <div class="progress-text" id="progressText">1 / 10</div>
+      <div class="progress-bar-bg">
+        <div class="progress-bar-fill" id="progressFill"></div>
+      </div>
+    </div>
+
+    <div class="card">
+      <span class="badge" id="typeBadge">유형</span>
+      <div class="question" id="questionArea"></div>
+
+      <!-- 4지선다 보기 -->
+      <div class="options" id="optionsArea"></div>
+
+      <!-- 직접 입력 (필요 시 표시) -->
+      <div class="input-area" id="inputArea" style="display:none;">
+        <input type="text" id="answerInput" placeholder="영단어를 입력하세요"
+               autocomplete="off" autocapitalize="off" autocorrect="off" spellcheck="false">
+        <button class="btn-primary" id="submitBtn">제출</button>
+      </div>
+
+      <div class="feedback" id="feedback"></div>
+    </div>
+  </section>
+
+  <!-- ================= 화면 3: 결과 ================= -->
+  <section id="screen-result" class="screen">
+    <div class="card">
+      <h2>학습 완료! 🎉</h2>
+
+      <div class="stat-list" id="statList"></div>
+      <div class="stat-total" id="statTotal"></div>
+
+      <div class="review-title">복습할 단어 (두 번 모두 틀림)</div>
+      <div class="review-list" id="reviewList"></div>
+
+      <button class="btn-primary" id="retrySameBtn" style="margin-top:20px;">같은 설정으로 다시 풀기</button>
+      <button class="btn-sub" id="restartBtn">처음으로 (범위 다시 설정)</button>
+    </div>
+  </section>
+
+</div>
+
+<script src="words.js"></script>
+<script>
+/* =========================================================
+   미니단어장 영단어 암기 앱
+   - words.js 의 const words = [{num, eng, kor}, ...] 사용
+   - 네트워크 요청/스토리지 없이 메모리 변수로만 상태 관리
+   ========================================================= */
+
+/* ---------- 전역 상태 ---------- */
+// words.js 로부터 실제 최대 단어 번호 / 최대 Unit 번호를 계산 (하드코딩 방지)
+var MAX_NUM = (typeof words !== 'undefined' && words.length) ? words.length : 0;
+var MAX_UNIT = (typeof words !== 'undefined' && words.length)
+  ? words.reduce(function (m, w) { return Math.max(m, w.unit); }, 1)
+  : 0;
+
+var config = { mode: 'unit', start: 1, end: MAX_NUM, count: 10 };  // 설정값
+var quiz = [];              // 이번 세션 문제 배열
+var current = 0;            // 현재 문제 인덱스
+var wrongAttempts = 0;      // 현재 문제에서의 오답 횟수(0=아직 없음)
+var judging = false;        // 판정 중 중복 클릭 방지 플래그
+var results = { first: 0, second: 0, wrongList: [] }; // 통계
+
+/* ---------- DOM 참조 ---------- */
+var el = function (id) { return document.getElementById(id); };
+
+/* ---------- 유틸 함수 ---------- */
+// min~max 정수 무작위 (양끝 포함)
+function randInt(min, max) {
+  return Math.floor(Math.random() * (max - min + 1)) + min;
+}
+// 배열 섞기 (Fisher–Yates)
+function shuffle(arr) {
+  var a = arr.slice();
+  for (var i = a.length - 1; i > 0; i--) {
+    var j = Math.floor(Math.random() * (i + 1));
+    var t = a[i]; a[i] = a[j]; a[j] = t;
+  }
+  return a;
+}
+// 화면 전환
+function showScreen(name) {
+  var screens = document.querySelectorAll('.screen');
+  for (var i = 0; i < screens.length; i++) screens[i].classList.remove('active');
+  el('screen-' + name).classList.add('active');
+  window.scrollTo(0, 0);
+}
+
+/* =========================================================
+   설정 화면 로직
+   ========================================================= */
+function initSetup() {
+  // words 배열 미로드 시 안내
+  if (typeof words === 'undefined' || !Array.isArray(words) || words.length === 0) {
+    showSetupMsg('error',
+      '단어 데이터(words.js)를 불러오지 못했습니다.<br>' +
+      'index.html 과 words.js 가 같은 폴더에 있는지 확인해주세요.');
+    el('startBtn').disabled = true;
+    el('startBtn').style.opacity = '0.5';
+    return;
+  }
+
+  // 실제 데이터 범위에 맞춰 라벨/입력 한도 갱신
+  el('unitRangeLabel').textContent = 'Unit 범위 (1 ~ ' + MAX_UNIT + ')';
+  el('numRangeLabel').textContent = '단어 번호 범위 (1 ~ ' + MAX_NUM + ')';
+  el('unitStart').max = MAX_UNIT;
+  el('unitEnd').max = MAX_UNIT;
+  el('startNum').max = MAX_NUM;
+  el('endNum').max = MAX_NUM;
+
+  // 선택 방식 전환 (Unit ↔ 단어 번호) — 하나를 선택하면 다른 하나는 입력 불가
+  el('modeSelect').addEventListener('change', function () {
+    applyMode(this.value);
+  });
+  applyMode(el('modeSelect').value);
+}
+
+// 선택 모드에 따라 입력 필드 표시/비활성화 전환
+function applyMode(mode) {
+  var unitField = el('unitRangeField');
+  var numField = el('numRangeField');
+
+  if (mode === 'unit') {
+    unitField.classList.add('active');
+    numField.classList.remove('active');
+    el('unitStart').disabled = false;
+    el('unitEnd').disabled = false;
+    el('startNum').disabled = true;
+    el('endNum').disabled = true;
+  } else {
+    unitField.classList.remove('active');
+    numField.classList.add('active');
+    el('unitStart').disabled = true;
+    el('unitEnd').disabled = true;
+    el('startNum').disabled = false;
+    el('endNum').disabled = false;
+  }
+}
+
+function showSetupMsg(type, html) {
+  var m = el('setupMsg');
+  m.className = 'msg show ' + type;
+  m.innerHTML = html;
+}
+function hideSetupMsg() {
+  el('setupMsg').className = 'msg';
+}
+
+// "시작하기" 클릭 → 입력 검증 후 문제 생성
+function onStart() {
+  hideSetupMsg();
+
+  var mode = el('modeSelect').value;   // 'unit' 또는 'num'
+  var count = parseInt(el('countNum').value, 10);
+  var pool;
+  var start, end;
+
+  if (mode === 'unit') {
+    // ----- Unit 번호로 선택 -----
+    start = parseInt(el('unitStart').value, 10);
+    end = parseInt(el('unitEnd').value, 10);
+
+    if (isNaN(start) || isNaN(end)) {
+      return showSetupMsg('error', 'Unit 시작 번호와 끝 번호를 모두 입력해주세요.');
+    }
+    if (start < 1 || start > MAX_UNIT || end < 1 || end > MAX_UNIT) {
+      return showSetupMsg('error', 'Unit 번호는 1 ~ ' + MAX_UNIT + ' 사이여야 합니다.');
+    }
+    if (start > end) {
+      return showSetupMsg('error', '시작 Unit 번호는 끝 Unit 번호보다 작거나 같아야 합니다.');
+    }
+
+    pool = words.filter(function (w) { return w.unit >= start && w.unit <= end; });
+  } else {
+    // ----- 단어 번호로 선택 -----
+    start = parseInt(el('startNum').value, 10);
+    end = parseInt(el('endNum').value, 10);
+
+    if (isNaN(start) || isNaN(end)) {
+      return showSetupMsg('error', '시작 번호와 끝 번호를 모두 입력해주세요.');
+    }
+    if (start < 1 || start > MAX_NUM || end < 1 || end > MAX_NUM) {
+      return showSetupMsg('error', '단어 번호는 1 ~ ' + MAX_NUM + ' 사이여야 합니다.');
+    }
+    if (start > end) {
+      return showSetupMsg('error', '시작 번호는 끝 번호보다 작거나 같아야 합니다.');
+    }
+
+    pool = words.filter(function (w) { return w.num >= start && w.num <= end; });
+  }
+
+  if (pool.length < 4) {
+    return showSetupMsg('error',
+      '범위 내 단어가 ' + pool.length + '개뿐입니다.<br>' +
+      '4지선다 보기를 만들려면 최소 4개 이상이 필요합니다. 범위를 넓혀주세요.');
+  }
+
+  // 문제 수 검사 및 자동 조정
+  if (isNaN(count)) count = 10;
+  if (count < 10) count = 10;
+  if (count > 100) count = 100;
+
+  var adjustedNote = '';
+  if (count > pool.length) {
+    count = pool.length;   // 범위 내 단어 수로 자동 조정
+    adjustedNote = '범위 내 단어가 부족하여 문제 수를 ' + count + '개로 조정했습니다.';
+  }
+
+  config = { mode: mode, start: start, end: end, count: count };
+
+  // 문제 생성 후 시작 (조정 안내가 있으면 잠깐 보여주고 시작)
+  buildQuiz(pool, count);
+  if (adjustedNote) {
+    showSetupMsg('notice', adjustedNote);
+    setTimeout(startQuiz, 900);
+  } else {
+    startQuiz();
+  }
+}
+
+/* =========================================================
+   문제 생성 로직
+   ========================================================= */
+// 범위 pool 에서 count 개를 무작위·중복 없이 뽑아 각 문제 구성
+function buildQuiz(pool, count) {
+  var chosen = shuffle(pool).slice(0, count);  // 출제할 단어들
+  quiz = chosen.map(function (w) { return makeQuestion(w, pool); });
+}
+
+// 단어 하나 → 문제 객체 생성 (유형 무작위)
+function makeQuestion(word, pool) {
+  var type = randInt(1, 4);  // 1~4 유형 무작위
+
+  // 빈칸 유형인데 빈칸을 못 만드는 극단적 경우 대비 → 다른 유형으로 대체
+  if (type === 3 && !canMakeBlank(word.eng)) {
+    type = randInt(1, 2);
+  }
+
+  if (type === 1) {
+    // ① 한글 뜻 → 영단어 4지선다 ("단어 맞추기")
+    var d1 = pickDistractors(pool, word, 3, function (x) { return x.eng; });
+    var opts1 = shuffle([word.eng].concat(d1.map(function (x) { return x.eng; })));
+    return {
+      type: 1, badge: '단어 맞추기', word: word,
+      prompt: word.kor, promptClass: '',
+      options: opts1, answer: word.eng
+    };
+  }
+  else if (type === 2) {
+    // ② 영단어 → 한글 뜻 4지선다 ("뜻 맞추기")
+    var d2 = pickDistractors(pool, word, 3, function (x) { return x.kor; });
+    var opts2 = shuffle([word.kor].concat(d2.map(function (x) { return x.kor; })));
+    return {
+      type: 2, badge: '뜻 맞추기', word: word,
+      prompt: word.eng, promptClass: '',
+      options: opts2, answer: word.kor
+    };
+  }
+  else if (type === 3) {
+    // ③ 빈칸 알파벳 채우기 ("빈칸 채우기") - 직접 입력 방식
+    var b = makeBlank(word.eng);
+    return {
+      type: 3, badge: '빈칸 채우기', word: word,
+      prompt: '<span class="blankword">' + b.display + '</span>' +
+              '<span class="sub">' + escapeHtml(word.kor) + '</span>',
+      promptRaw: true,
+      options: null, answer: b.answer
+    };
+  }
+  else {
+    // ④ 한글 뜻 → 영단어 직접 입력 ("직접 입력")
+    return {
+      type: 4, badge: '직접 입력', word: word,
+      prompt: word.kor, promptClass: '',
+      options: null, answer: word.eng
+    };
+  }
+}
+
+// pool 에서 word 제외, keyFn 기준 중복 없이 n개 뽑기
+function pickDistractors(pool, word, n, keyFn) {
+  var seen = {};
+  seen[keyFn(word)] = true;           // 정답 키 제외
+  var candidates = shuffle(pool);
+  var out = [];
+  for (var i = 0; i < candidates.length && out.length < n; i++) {
+    var k = keyFn(candidates[i]);
+    if (!seen[k]) { seen[k] = true; out.push(candidates[i]); }
+  }
+  return out;
+}
+
+/* ---------- 빈칸 유형 헬퍼 ---------- */
+// 빈칸을 만들 수 있는지: 첫/끝 제외한 '알파벳' 중간 글자가 1개 이상
+function canMakeBlank(eng) {
+  return middleLetterIndices(eng).length >= 1;
+}
+// 첫/끝 제외, 하이픈 아닌 알파벳 위치들의 인덱스 목록
+function middleLetterIndices(eng) {
+  var idx = [];
+  for (var i = 1; i < eng.length - 1; i++) {
+    if (/[a-zA-Z]/.test(eng.charAt(i))) idx.push(i);
+  }
+  return idx;
+}
+// 빈칸 만들기: 첫/끝 글자는 유지, 중간에서 무작위 개수·위치 선택
+function makeBlank(eng) {
+  var chars = eng.split('');
+  var eligible = middleLetterIndices(eng);       // 빈칸 가능한 위치들
+  var maxBlanks = eligible.length;               // 최대 = 중간 알파벳 수 (=글자수-2, 하이픈 제외)
+  var blankCount = randInt(1, maxBlanks);         // 무작위 빈칸 개수 (1 ~ max)
+  var positions = shuffle(eligible).slice(0, blankCount)
+                    .sort(function (a, b) { return a - b; });  // 위치 오름차순
+  var posSet = {};
+  positions.forEach(function (p) { posSet[p] = true; });
+
+  // 정답 = 빈칸에 들어갈 알파벳들을 순서대로 나열
+  var answer = positions.map(function (p) { return chars[p]; }).join('');
+  // 화면 표시 = 빈칸 위치는 '_', 나머지는 그대로 (하이픈 포함)
+  var display = chars.map(function (c, i) { return posSet[i] ? '_' : c; }).join('');
+
+  return { display: display, answer: answer, blankCount: blankCount };
+}
+// 길이 len 의 무작위 소문자 알파벳 조합
+function randomCombo(len) {
+  var letters = 'abcdefghijklmnopqrstuvwxyz';
+  var s = '';
+  for (var i = 0; i < len; i++) s += letters.charAt(randInt(0, 25));
+  return s;
+}
+// HTML 이스케이프 (한글 뜻 안전 삽입용)
+function escapeHtml(str) {
+  return String(str)
+    .replace(/&/g, '&amp;').replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+}
+
+/* =========================================================
+   문제 풀이 화면 로직
+   ========================================================= */
+function startQuiz() {
+  current = 0;
+  results = { first: 0, second: 0, wrongList: [] };
+  hideSetupMsg();
+  showScreen('quiz');
+  renderQuestion();
+}
+
+function renderQuestion() {
+  wrongAttempts = 0;
+  judging = false;
+
+  var q = quiz[current];
+
+  // 진행 상황 표시
+  el('progressText').textContent = (current + 1) + ' / ' + quiz.length;
+  el('progressFill').style.width = ((current) / quiz.length * 100) + '%';
+
+  // 유형 뱃지
+  el('typeBadge').textContent = q.badge;
+
+  // 문제문 표시
+  var qArea = el('questionArea');
+  if (q.promptRaw) qArea.innerHTML = q.prompt;                 // 빈칸 유형(HTML 포함)
+  else qArea.innerHTML = escapeHtml(q.prompt);
+
+  // 피드백 초기화
+  var fb = el('feedback');
+  fb.textContent = '';
+  fb.className = 'feedback';
+
+  // 보기 / 입력 영역 분기
+  var optArea = el('optionsArea');
+  var inputArea = el('inputArea');
+  optArea.innerHTML = '';
+
+  if (q.type === 4 || q.type === 3) {
+    // 직접 입력 유형 (④ 영단어 전체 입력 / ③ 빈칸 알파벳 입력)
+    optArea.style.display = 'none';
+    inputArea.style.display = 'flex';
+    var inp = el('answerInput');
+    inp.value = '';
+    inp.disabled = false;
+    // 빈칸 유형은 빈칸 개수만큼 알파벳을 순서대로 입력하도록 안내
+    inp.placeholder = (q.type === 3)
+      ? '빈칸에 들어갈 알파벳을 순서대로 입력'
+      : '영단어를 입력하세요';
+    el('submitBtn').disabled = false;
+    inp.focus();
+  } else {
+    // 4지선다 유형
+    inputArea.style.display = 'none';
+    optArea.style.display = 'flex';
+    q.options.forEach(function (opt) {
+      var b = document.createElement('button');
+      b.className = 'option';
+      b.textContent = opt;
+      b.onclick = function () { onOption(b, opt, q); };
+      optArea.appendChild(b);
+    });
+  }
+}
+
+// 4지선다 보기 클릭 처리
+function onOption(btnEl, chosen, q) {
+  if (judging) return;              // 판정 중 중복 클릭 방지
+  var correct = (chosen === q.answer);
+  processResult(correct, q, btnEl);
+}
+
+// 직접 입력 제출 처리
+function onSubmit() {
+  if (judging) return;
+  var q = quiz[current];
+  var raw = el('answerInput').value;
+  var val = raw.trim();
+  if (val === '') {
+    var fb = el('feedback');
+    fb.textContent = '답을 입력해주세요';
+    fb.className = 'feedback wrong';
+    return;
+  }
+  // 채점: 대소문자 무시, 앞뒤 공백 무시, 스펠링은 정확히
+  var correct = (val.toLowerCase() === q.answer.toLowerCase());
+  processResult(correct, q, null);
+}
+
+// 공통 채점 처리 (btnEl: 4지선다에서 클릭한 버튼, 없으면 null)
+function processResult(correct, q, btnEl) {
+  judging = true;
+  var fb = el('feedback');
+
+  if (correct) {
+    // ----- 정답 -----
+    if (btnEl) btnEl.classList.add('correct');
+    if (wrongAttempts === 0) results.first++;   // 첫 시도 정답
+    else results.second++;                      // 두 번째 시도 정답
+    fb.textContent = '⭕ 정답입니다!';
+    fb.className = 'feedback correct';
+    lockInputs();
+    setTimeout(nextQuestion, 1500);             // 1.5초 후 다음 문제
+    return;
+  }
+
+  // ----- 오답 -----
+  wrongAttempts++;
+
+  if (wrongAttempts === 1) {
+    // 첫 오답: 재도전 기회 제공
+    fb.textContent = '❌ 틀렸습니다. 한 번 더 시도하세요!';
+    fb.className = 'feedback wrong';
+    if (btnEl) {
+      // 선택한 오답 보기 비활성화
+      btnEl.classList.add('wrong');
+      setTimeout(function () {
+        btnEl.classList.remove('wrong');
+        btnEl.classList.add('disabled');
+        judging = false;               // 다시 시도 가능
+      }, 600);
+    } else {
+      // 직접 입력: 입력창 비우기
+      el('answerInput').value = '';
+      el('answerInput').focus();
+      judging = false;
+    }
+  } else {
+    // 두 번째 오답: 정답 공개 후 다음 문제
+    results.wrongList.push(q.word);
+    fb.innerHTML = '❌ 정답은 <b>' + escapeHtml(answerLabel(q)) + '</b> 입니다';
+    fb.className = 'feedback wrong';
+    if (btnEl) btnEl.classList.add('wrong');
+    lockInputs();
+    setTimeout(nextQuestion, 2500);    // 2.5초 후 다음 문제
+  }
+}
+
+// 결과 공개용 정답 라벨 (빈칸 유형은 전체 단어도 함께 표기)
+function answerLabel(q) {
+  if (q.type === 3) return q.word.eng + ' (' + q.answer + ')';
+  return q.answer;
+}
+
+// 모든 입력/보기 잠그기
+function lockInputs() {
+  var opts = el('optionsArea').querySelectorAll('.option');
+  for (var i = 0; i < opts.length; i++) opts[i].classList.add('disabled');
+  el('answerInput').disabled = true;
+  el('submitBtn').disabled = true;
+}
+
+// 다음 문제 or 결과
+function nextQuestion() {
+  current++;
+  if (current >= quiz.length) {
+    el('progressFill').style.width = '100%';
+    showResult();
+  } else {
+    renderQuestion();
+  }
+}
+
+/* =========================================================
+   결과 화면 로직
+   ========================================================= */
+function showResult() {
+  var total = quiz.length;
+  var first = results.first;
+  var second = results.second;
+  var both = results.wrongList.length;
+  var correctSum = first + second;
+
+  var pct = function (n) {
+    if (total === 0) return '0';
+    return (n / total * 100).toFixed(1);
+  };
+
+  // 통계 목록
+  var stat = el('statList');
+  stat.innerHTML =
+    row('푼 문제 수', total + '개') +
+    row('첫 시도 정답', first + '개 (' + pct(first) + '%)') +
+    row('두 번째 시도 정답', second + '개 (' + pct(second) + '%)') +
+    row('두 번 모두 틀림', both + '개 (' + pct(both) + '%)');
+
+  el('statTotal').textContent =
+    '전체 정답률 ' + pct(correctSum) + '%';
+
+  // 복습 목록
+  var review = el('reviewList');
+  if (results.wrongList.length === 0) {
+    review.innerHTML = '<div class="review-empty">두 번 모두 틀린 단어가 없습니다! 👏</div>';
+  } else {
+    review.innerHTML = results.wrongList.map(function (w) {
+      return '<div class="review-item">' +
+               '<div class="eng">' + escapeHtml(w.eng) + '</div>' +
+               '<div class="kor">' + escapeHtml(w.kor) + '</div>' +
+             '</div>';
+    }).join('');
+  }
+
+  showScreen('result');
+}
+
+// 통계 한 줄 HTML
+function row(label, value) {
+  return '<div class="stat-row"><span class="label">' + label +
+         '</span><span class="value">' + value + '</span></div>';
+}
+
+/* =========================================================
+   버튼 이벤트 연결
+   ========================================================= */
+el('startBtn').onclick = onStart;
+el('submitBtn').onclick = onSubmit;
+
+// 직접 입력에서 Enter 제출
+el('answerInput').addEventListener('keydown', function (e) {
+  if (e.key === 'Enter') { e.preventDefault(); onSubmit(); }
+});
+
+// 같은 설정으로 다시 풀기 (범위 pool 재추출 → 새 문제)
+el('retrySameBtn').onclick = function () {
+  var pool = (config.mode === 'unit')
+    ? words.filter(function (w) { return w.unit >= config.start && w.unit <= config.end; })
+    : words.filter(function (w) { return w.num >= config.start && w.num <= config.end; });
+  buildQuiz(pool, config.count);
+  startQuiz();
+};
+
+// 처음으로 (설정 화면)
+el('restartBtn').onclick = function () {
+  hideSetupMsg();
+  showScreen('setup');
+};
+
+/* ---------- 앱 시작 ---------- */
+initSetup();
+</script>
+</body>
+</html>
