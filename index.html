@@ -575,24 +575,25 @@ function pickDistractors(pool, word, n, keyFn) {
 }
 
 /* ---------- 빈칸 유형 헬퍼 ---------- */
-// 빈칸을 만들 수 있는지: 첫/끝 제외한 '알파벳' 중간 글자가 1개 이상
+// 빈칸을 만들 수 있는지: '알파벳' 글자가 2개 이상 (최소 1글자는 남겨둬야 함)
 function canMakeBlank(eng) {
-  return middleLetterIndices(eng).length >= 1;
+  return letterIndices(eng).length >= 2;
 }
-// 첫/끝 제외, 하이픈 아닌 알파벳 위치들의 인덱스 목록
-function middleLetterIndices(eng) {
+// 하이픈/공백 등이 아닌 '알파벳' 위치들의 인덱스 목록 (첫/끝 글자 포함)
+function letterIndices(eng) {
   var idx = [];
-  for (var i = 1; i < eng.length - 1; i++) {
+  for (var i = 0; i < eng.length; i++) {
     if (/[a-zA-Z]/.test(eng.charAt(i))) idx.push(i);
   }
   return idx;
 }
-// 빈칸 만들기: 첫/끝 글자는 유지, 중간에서 무작위 개수·위치 선택
+// 빈칸 만들기: 첫/끝 글자를 포함한 모든 알파벳 위치 중에서 무작위 개수·위치 선택
+// (연속된 위치일 수도, 띄엄띄엄 흩어진 위치일 수도 있음). 단, 최소 1글자는 항상 남겨둠.
 function makeBlank(eng) {
   var chars = eng.split('');
-  var eligible = middleLetterIndices(eng);       // 빈칸 가능한 위치들
-  var maxBlanks = eligible.length;               // 최대 = 중간 알파벳 수 (=글자수-2, 하이픈 제외)
-  var blankCount = randInt(1, maxBlanks);         // 무작위 빈칸 개수 (1 ~ max)
+  var eligible = letterIndices(eng);              // 빈칸 가능한 전체 알파벳 위치
+  var maxBlanks = eligible.length - 1;             // 최소 1글자는 화면에 남겨둠
+  var blankCount = randInt(1, maxBlanks);          // 무작위 빈칸 개수 (1 ~ max)
   var positions = shuffle(eligible).slice(0, blankCount)
                     .sort(function (a, b) { return a - b; });  // 위치 오름차순
   var posSet = {};
